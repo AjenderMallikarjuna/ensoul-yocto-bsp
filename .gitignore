@@ -1,0 +1,22 @@
+build/
+poky/
+meta-openembedded/
+downloads/
+sstate-cache/
+*.pyc
+__pycache__/
+
+# Logs
+*.log
+*.err.log
+*.out.log
+*.pid
+
+# Business documents (tracked in ensoul-documents repo)
+*.docx
+*.html
+~$*
+
+# IDE / tooling
+.vscode/
+.claude/

@@ -1,0 +1,65 @@
+header:
+  version: 14
+
+machine: raspberrypi4-64
+distro: poky
+target:
+  - anime-ai-image
+
+repos:
+  poky:
+    url: https://git.yoctoproject.org/poky
+    branch: scarthgap
+    layers:
+      meta:
+      meta-poky:
+      meta-yocto-bsp:
+
+  meta-openembedded:
+    url: https://github.com/openembedded/meta-openembedded.git
+    branch: scarthgap
+    layers:
+      meta-oe:
+      meta-python:
+      meta-networking:
+      meta-multimedia:
+
+  meta-raspberrypi:
+    url: https://github.com/agherzan/meta-raspberrypi.git
+    branch: scarthgap
+    layers:
+      meta-raspberrypi:
+
+  meta-anime-ai:
+    path: .
+    layers:
+      meta-anime-ai:
+
+local_conf_header:
+  anime-ai-base: |
+    CONF_VERSION = "2"
+    PACKAGE_CLASSES = "package_ipk"
+    EXTRA_IMAGE_FEATURES ?= "debug-tweaks ssh-server-openssh"
+
+  anime-ai-systemd: |
+    DISTRO_FEATURES:append = " systemd usrmerge wifi bluetooth"
+    VIRTUAL-RUNTIME_init_manager = "systemd"
+    VIRTUAL-RUNTIME_initscripts = ""
+    DISTRO_FEATURES_BACKFILL_CONSIDERED += "sysvinit"
+
+  anime-ai-rpi: |
+    # Firmware / boot
+    GPU_MEM = "64"
+    ENABLE_UART = "1"
+    ENABLE_I2C = "1"
+    ENABLE_SPI = "1"
+    # dtoverlay=pwm-2chan exposes PWM0→GPIO18 and PWM1→GPIO19 via sysfs
+    RPI_EXTRA_CONFIG = "dtoverlay=pwm-2chan\n"
+    MACHINE_FEATURES:append = " wifi bluetooth"
+    IMAGE_FSTYPES += "wic.bz2 rpi-sdimg"
+
+  anime-ai-dev: |
+    INHERIT += "rm_work"
+    BB_NUMBER_THREADS = "4"
+    PARALLEL_MAKE = "-j4"
+    PARALLEL_MAKE:pn-libmpc-native = "-j1"

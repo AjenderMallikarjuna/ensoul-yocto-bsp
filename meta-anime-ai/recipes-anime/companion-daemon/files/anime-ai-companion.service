@@ -1,0 +1,24 @@
+[Unit]
+Description=Anime.AI companion daemon
+After=network-online.target sound.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/anime-ai-companion
+Restart=always
+RestartSec=5
+
+# Drop secrets here at provisioning time; file should be 0600 root:root
+EnvironmentFile=-/etc/anime-ai/secrets.env
+
+# API keys can also be set via /etc/anime-ai/secrets.toml (see companion.toml)
+# Uncomment and populate for quick testing:
+# Environment=ANTHROPIC_API_KEY=sk-ant-...
+# Environment=OPENAI_API_KEY=sk-...
+
+RuntimeDirectory=anime-ai
+RuntimeDirectoryMode=0755
+
+[Install]
+WantedBy=multi-user.target

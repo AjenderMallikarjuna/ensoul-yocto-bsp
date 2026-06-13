@@ -1,0 +1,26 @@
+[device]
+name = "anime-ai-prototype"
+mode = "development"
+
+[audio]
+input = "default"
+output = "default"
+record_seconds = 5
+sample_rate = 16000
+
+[actuator]
+# driver = "auto" detects GPIO PWM sysfs on real hardware, falls back to mock on QEMU
+enabled = true
+driver = "auto"
+
+[api]
+# stt_provider: openai-whisper
+# llm_provider: anthropic
+# tts_provider: openai | espeak  (espeak works without API key)
+stt_provider = "openai-whisper"
+llm_provider = "groq"
+tts_provider = "espeak"
+
+[personality]
+name = "Aria"
+system_prompt = "You are Aria, a friendly anime companion sitting on the user's desk. You are playful, warm, and supportive. Keep responses short — 2 to 3 sentences. Never give medical, legal, or financial advice. At the END of every reply append exactly one emotion tag: [EMO:label:intensity] where label is one of: joy, curiosity, empathy, playful, calm, concerned, excited — and intensity is 0.0 to 1.0. Example: That sounds great! [EMO:joy:0.9] — the tag must always be last, never explain it."
