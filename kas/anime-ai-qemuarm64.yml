@@ -22,6 +22,7 @@ repos:
       meta-oe:
       meta-python:
       meta-networking:
+      meta-multimedia:
 
   meta-anime-ai:
     path: .
@@ -35,10 +36,20 @@ local_conf_header:
     EXTRA_IMAGE_FEATURES ?= "debug-tweaks ssh-server-openssh"
 
   anime-ai-systemd: |
-    DISTRO_FEATURES:append = " systemd usrmerge wifi bluetooth"
+    DISTRO_FEATURES:append = " systemd usrmerge wifi bluetooth alsa"
     VIRTUAL-RUNTIME_init_manager = "systemd"
     VIRTUAL-RUNTIME_initscripts = ""
     DISTRO_FEATURES_BACKFILL_CONSIDERED += "sysvinit"
+
+  anime-ai-audio: |
+    # QEMU Intel HDA audio emulation.
+    # QB_AUDIO_DRV controls the host-side backend:
+    #   "pa"   — PulseAudio (works on WSL2 with WSLg, native Linux)
+    #   "alsa" — ALSA directly on the host
+    #   "wav"  — write audio to /tmp/ensoul-qemu.wav (no host audio needed)
+    QB_AUDIO_DRV = "pa"
+    QB_AUDIO_OPT = "-device intel-hda -device hda-duplex,audiodev=snd0 -audiodev pa,id=snd0"
+    MACHINE_FEATURES:append = " alsa"
 
   anime-ai-dev: |
     INHERIT += "rm_work"

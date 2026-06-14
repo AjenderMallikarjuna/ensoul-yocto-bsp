@@ -1,0 +1,21 @@
+[Unit]
+Description=PipeWire Multimedia Service (system-wide)
+Documentation=https://pipewire.org
+After=dbus.service
+Requires=dbus.service
+
+[Service]
+Type=simple
+# Use /run/pipewire as XDG_RUNTIME_DIR so the socket is at
+# /run/pipewire/pipewire-0 — accessible to all processes.
+Environment=XDG_RUNTIME_DIR=/run/pipewire
+Environment=PIPEWIRE_RUNTIME_DIR=/run/pipewire
+ExecStartPre=/bin/mkdir -p /run/pipewire
+ExecStartPre=/bin/chmod 0755 /run/pipewire
+ExecStart=/usr/bin/pipewire
+Restart=on-failure
+RestartSec=5
+KillMode=mixed
+
+[Install]
+WantedBy=multi-user.target

@@ -10,7 +10,18 @@ RDEPENDS:${PN} = " \
     python3-core \
     python3-json \
     python3-logging \
-    alsa-utils \
-    espeak \
     openssh-sftp-server \
+    \
+    alsa-utils \
+    alsa-plugins \
+    \
+    pipewire \
+    pipewire-alsa \
+    pipewire-tools \
+    wireplumber \
+    pipewire-system \
+    \
+    webrtc-audio-processing \
+    \
+    ensoul-tools \
 "
