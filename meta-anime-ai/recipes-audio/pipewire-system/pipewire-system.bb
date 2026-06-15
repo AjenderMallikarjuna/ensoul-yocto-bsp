@@ -25,9 +25,6 @@ do_install() {
     install -m 0644 ${WORKDIR}/pipewire-system.service   ${D}${systemd_system_unitdir}/
     install -m 0644 ${WORKDIR}/wireplumber-system.service ${D}${systemd_system_unitdir}/
 
-    # Runtime directory (created by the service, but also declare it here)
-    install -d ${D}/run/pipewire
-
     # Profile.d so all shells know where to find the PipeWire socket
     install -d ${D}${sysconfdir}/profile.d
     install -m 0644 ${WORKDIR}/50-pipewire-env.sh ${D}${sysconfdir}/profile.d/
@@ -43,5 +40,4 @@ FILES:${PN} = " \
     ${systemd_system_unitdir}/wireplumber-system.service \
     ${sysconfdir}/profile.d/50-pipewire-env.sh \
     ${sysconfdir}/environment.d/10-pipewire.conf \
-    /run/pipewire \
 "

@@ -53,6 +53,6 @@ local_conf_header:
 
   anime-ai-dev: |
     INHERIT += "rm_work"
-    BB_NUMBER_THREADS = "4"
-    PARALLEL_MAKE = "-j4"
+    BB_NUMBER_THREADS = "16"
+    PARALLEL_MAKE = "-j16"
     PARALLEL_MAKE:pn-libmpc-native = "-j1"
