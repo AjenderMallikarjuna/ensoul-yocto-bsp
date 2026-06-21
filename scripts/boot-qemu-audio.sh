@@ -21,8 +21,8 @@ if [ ! -S /mnt/wslg/PulseServer ]; then
     exit 1
 fi
 
-echo "Boosting WSLg mic input to 600%..."
-PULSE_SERVER=unix:/mnt/wslg/PulseServer pactl set-source-volume RDPSource 600%
+echo "Setting WSLg mic input to 300% (avoids clipping that 600% caused)..."
+PULSE_SERVER=unix:/mnt/wslg/PulseServer pactl set-source-volume RDPSource 300%
 
 echo "Image: $IMG"
 echo "SSH will be available at: ssh -p 2222 root@127.0.0.1"
