@@ -8,5 +8,6 @@ IMAGE_FEATURES += "ssh-server-openssh"
 
 IMAGE_INSTALL:append = " \
     packagegroup-anime-ai \
+    webrtc-audio-processing \
 "
 
