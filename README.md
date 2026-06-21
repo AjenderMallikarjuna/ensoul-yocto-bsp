@@ -1,130 +1,123 @@
-# Anime.AI Yocto Workspace
+# Ensoul AI — Yocto BSP
 
-Embedded Linux starting point for the Anime.AI desk companion prototype.
+Embedded Linux BSP for the Ensoul AI child companion toy. Target hardware is **Rockchip RK3588** (octa-core, 6 TOPS NPU). Development and CI run on QEMU ARM64.
 
-The pipeline per conversation turn:
-**mic → Whisper STT → Claude Haiku → TTS → speaker + servo nod**
+## Audio Pipeline
 
-## Prototype Targets
+```
+mic → WebRTC APM (AEC/NS/AGC) → Sherpa-ONNX (VAD + wake word + STT) → Claude API → Piper TTS → speaker
+                 └── PipeWire (RT audio routing, clock management) ──┘
+```
 
-| Target | Kas config | Use |
-|--------|-----------|-----|
-| `qemuarm64` | `kas/anime-ai-qemuarm64.yml` | Development, CI |
-| `raspberrypi4-64` | `kas/anime-ai-rpi4.yml` | Hardware prototype |
+| Component | Role | Replaces |
+|-----------|------|---------|
+| PipeWire + WirePlumber | RT audio routing, clock, ALSA bridge | Custom abox daemon |
+| WebRTC APM (AEC3/NS/AGC2) | Echo cancellation, noise suppression | Custom DSP pipeline |
+| Sherpa-ONNX Zipformer | Streaming STT, 80–200 ms latency | Cloud Whisper API |
+| Silero VAD | Voice activity detection, endpointing | Custom VAD |
+| Piper TTS | On-device TTS, ~80 ms to first audio | Cloud TTS |
 
-The actuator driver auto-detects: GPIO PWM on real RPi hardware, mock (log-only) on QEMU.
+See [`ensoul-audio-design.md`](ensoul-audio-design.md) for the full architecture.
+
+## Build Status
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| 0 | QEMU ARM64 boots with PipeWire audio | ✅ Complete |
+| 1 | Sherpa-ONNX STT + ensoul-audio daemon | Planned |
+| 2 | Piper TTS + session state machine | Planned |
+| 3 | Claude API integration + barge-in | Planned |
+| 4 | RK3588 hardware bring-up | Planned |
 
 ## Workspace Layout
 
-```text
+```
 .
 ├── kas/
-│   ├── anime-ai-qemuarm64.yml
-│   └── anime-ai-rpi4.yml
+│   └── anime-ai-qemuarm64.yml      ← QEMU ARM64 build config
 ├── meta-anime-ai/
 │   ├── conf/layer.conf
-│   ├── recipes-anime/companion-daemon/
-│   │   ├── companion-daemon.bb
-│   │   └── files/
-│   │       ├── anime-ai-companion.py   ← main daemon
-│   │       ├── anime-ai-companion.service
-│   │       ├── companion.toml          ← device config
-│   │       └── companion/             ← Python package
-│   │           ├── audio.py
-│   │           ├── stt.py             ← Whisper API
-│   │           ├── chat.py            ← Claude Haiku
-│   │           ├── tts.py             ← OpenAI TTS / espeak-ng
-│   │           ├── actuator.py        ← factory + mock driver
-│   │           ├── actuator_gpio.py   ← RPi sysfs PWM servo
-│   │           ├── api_server.py      ← HTTP API :8080
-│   │           └── config.py
-│   └── recipes-core/
-│       ├── images/anime-ai-image.bb
-│       └── packagegroups/packagegroup-anime-ai.bb
-└── scripts/
-    ├── build-qemuarm64.sh
-    ├── run-qemuarm64.sh
-    ├── build-rpi4.sh
-    └── flash-rpi4.sh
+│   ├── recipes-anime/
+│   │   ├── companion-daemon/        ← main application daemon
+│   │   └── ensoul-tools/           ← test & verification scripts
+│   ├── recipes-audio/
+│   │   └── pipewire-system/        ← system-wide PipeWire service
+│   ├── recipes-core/
+│   │   ├── images/anime-ai-image.bb
+│   │   └── packagegroups/packagegroup-anime-ai.bb
+│   └── recipes-kernel/
+│       └── linux/                  ← audio kernel config (HDA, virtio, USB)
+├── scripts/
+│   └── test-audio.sh               ← Phase 0 audio verification
+└── ensoul-audio-design.md          ← full audio architecture document
 ```
 
 ## Host Requirements
 
-Yocto builds run on Linux. On Windows, use WSL2 with Ubuntu 22.04 or 24.04.
+Yocto builds require Linux. On Windows use **WSL2 with Ubuntu 22.04 or 24.04**.
+
+> **Important:** Clone and build on the native WSL2 ext4 filesystem (`~/`), not on `/mnt/c/` (NTFS causes path errors and is too slow).
 
 ```bash
 sudo apt update
 sudo apt install -y gawk wget git diffstat unzip texinfo gcc build-essential \
   chrpath socat cpio python3 python3-pip python3-pexpect xz-utils debianutils \
-  iputils-ping python3-git python3-jinja2 libegl1-mesa libsdl1.2-dev pylint \
-  xterm python3-subunit mesa-common-dev zstd liblz4-tool file locales
+  iputils-ping python3-git python3-jinja2 libegl1-mesa libsdl1.2-dev \
+  xterm python3-subunit mesa-common-dev zstd liblz4-tool file locales \
+  zip rpcsvc-proto
 sudo locale-gen en_US.UTF-8
 python3 -m pip install --user kas
 ```
 
-## QEMU Build & Run
+## Build
 
 ```bash
-bash scripts/build-qemuarm64.sh
-bash scripts/run-qemuarm64.sh
+# Clone to native WSL2 filesystem
+git clone <repo-url> ~/ensoul-yocto-bsp
+cd ~/ensoul-yocto-bsp
+
+# Build (first build takes 2–4 hours; subsequent builds use sstate cache)
+kas build kas/anime-ai-qemuarm64.yml
 ```
 
-Test the pipeline without a microphone (dev shortcut):
-```bash
-curl -X POST http://localhost:8080/say \
-  -H 'Content-Type: application/json' \
-  -d '{"text": "Hello Aria, how are you?"}'
-curl http://localhost:8080/health
-```
-
-## RPi 4 Build & Flash
+To keep the build running after closing the terminal:
 
 ```bash
-bash scripts/build-rpi4.sh
-
-# Insert SD card, find its device with lsblk, then:
-bash scripts/flash-rpi4.sh /dev/sdX
+tmux new-session -d -s ensoul-build -c ~/ensoul-yocto-bsp \
+  'kas build kas/anime-ai-qemuarm64.yml 2>&1 | tee ~/ensoul-build/build.log'
+tmux attach -t ensoul-build   # reattach anytime; Ctrl+B D to detach
 ```
 
-### RPi Hardware Wiring
-
-| Signal | RPi pin | Notes |
-|--------|---------|-------|
-| Servo signal | GPIO 18 (pin 12) | PWM0, enabled by `dtoverlay=pwm-2chan` |
-| Servo 5 V | Pin 2 or 4 | Use external 5 V rail for >1 servo |
-| Servo GND | Pin 6 | Common ground with RPi |
-| USB mic | Any USB port | RPi has no built-in mic |
-| Speaker | 3.5 mm jack | Or USB audio adapter |
-
-### Setting API Keys on the Device
+## Run in QEMU
 
 ```bash
-# On the RPi (after first boot, via SSH):
-cat > /etc/anime-ai/secrets.env << 'EOF'
-ANTHROPIC_API_KEY=sk-ant-...
-OPENAI_API_KEY=sk-...
-EOF
-chmod 600 /etc/anime-ai/secrets.env
-systemctl restart anime-ai-companion
+cd ~/ensoul-yocto-bsp
+source poky/oe-init-build-env build
+runqemu qemuarm64 nographic
 ```
 
-## Companion Daemon HTTP API
+Login: `root` (no password).
 
-All endpoints are on port 8080.
+### Phase 0 Audio Verification
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/health` | Uptime, state, device info |
-| GET | `/status` | Current state: `idle / recording / processing / speaking` |
-| POST | `/listen` | Start a full mic → response turn (async, 202) |
-| POST | `/say` | Body: `{"text":"..."}` — skip STT, useful for dev |
+Inside QEMU:
 
-## Production Hardware Path
+```bash
+/usr/share/ensoul/test-audio.sh          # check audio stack
+/usr/share/ensoul/test-audio.sh --tone   # play 1 kHz test tone
+/usr/share/ensoul/test-audio.sh --record # 3-second record + playback
+```
 
-For the Founders Edition product, swap the BSP layer:
+Expected output:
+- `snd_hda_intel` module loaded
+- ALSA capture and playback devices present
+- PipeWire socket at `/run/pipewire/pipewire-0`
+- WirePlumber session manager running
 
-- **RPi CM4 / CM5** on a custom carrier board → still `meta-raspberrypi`
-- **NXP i.MX 8M** → NXP BSP layers
-- **Rockchip RK3566** → vendor BSP layers
+## Target Hardware
 
-`meta-anime-ai` stays unchanged; only the BSP layer and kas config change.
+Final product runs on **Rockchip RK3588**:
+- 4× Cortex-A76 + 4× Cortex-A55
+- 6 TOPS NPU (on-device AI inference)
+- HDMI out → hologram display
+- `meta-anime-ai` layer is hardware-agnostic; only the BSP layer changes for RK3588 bring-up
