@@ -22,6 +22,7 @@ RDEPENDS:${PN} = " \
     pipewire-system \
     \
     ensoul-tools \
+    ensoul-provision \
     \
     sherpa-onnx \
 "

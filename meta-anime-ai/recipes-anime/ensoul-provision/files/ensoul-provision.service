@@ -1,0 +1,17 @@
+[Unit]
+Description=Ensoul AI first-boot provisioning (STT model download)
+After=network-online.target
+Wants=network-online.target
+# Skip entirely if the model encoder is already on disk.
+ConditionPathExists=!/opt/ensoul/models/stt/sherpa-onnx-streaming-zipformer-en-20M-2023-02-17/encoder-epoch-99-avg-1.int8.onnx
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/share/ensoul/provision.sh
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target
