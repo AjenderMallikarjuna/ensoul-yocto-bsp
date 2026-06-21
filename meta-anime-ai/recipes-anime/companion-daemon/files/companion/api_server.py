@@ -740,11 +740,13 @@ class _Handler(BaseHTTPRequestHandler):
                 )
 
                 transcript = ""
-                for line in result.stdout.splitlines():
+                for line in result.stderr.splitlines():
                     if '"text"' in line:
                         try:
                             obj = json.loads(line.strip())
-                            transcript = obj.get("text", "")
+                            t = obj.get("text", "").strip()
+                            if t:
+                                transcript = t
                         except json.JSONDecodeError:
                             pass
 
