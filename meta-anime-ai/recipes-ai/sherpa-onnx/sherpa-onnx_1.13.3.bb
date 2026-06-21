@@ -12,10 +12,20 @@ SRC_URI[sha256sum] = "dca81c3d36c68e84949158a993e2ea99055bcecc96893f93739209fbe2
 
 S = "${WORKDIR}/sherpa-onnx-v${PV}-linux-aarch64-shared-cpu"
 
-# Pre-built aarch64 binaries fetched on an x86_64 build host:
-# arch    — cross-architecture is intentional (target = aarch64)
+# Pre-built aarch64 binaries fetched on an x86_64 build host.
+# arch           — target aarch64 built on x86_64 host, intentional
 # already-stripped — upstream ships stripped release binaries
-INSANE_SKIP:${PN} = "arch already-stripped"
+# file-rdeps     — libonnxruntime is bundled in this same package (self-satisfied dep);
+#                  libasound is declared via RDEPENDS below
+INSANE_SKIP:${PN} = "arch already-stripped file-rdeps"
+
+# Yocto default FILES:${PN}-dev claims any unversioned *.so as a linker stub.
+# Our libs are real runtime SOs (no libfoo.so.1 symlink chain) — keep them in ${PN}.
+FILES:${PN}-dev = ""
+FILES:${PN}-staticdev = ""
+
+# ALSA binaries (sherpa-onnx-alsa, etc.) link against libasound.so.2
+RDEPENDS:${PN} = "alsa-lib"
 
 do_configure[noexec] = "1"
 do_compile[noexec] = "1"
