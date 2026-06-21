@@ -8,6 +8,9 @@ Requires=pipewire-system.service
 Type=simple
 Environment=XDG_RUNTIME_DIR=/run/pipewire
 Environment=PIPEWIRE_RUNTIME_DIR=/run/pipewire
+# Disable D-Bus session bus autolaunch — headless system has no session bus.
+# Without this, WirePlumber crashes instead of skipping D-Bus gracefully.
+Environment=DBUS_SESSION_BUS_ADDRESS=disabled
 # Give PipeWire 2 s to create its socket before WirePlumber connects
 ExecStartPre=/bin/sleep 2
 ExecStart=/usr/bin/wireplumber
