@@ -1,8 +1,8 @@
 [Unit]
 Description=WirePlumber Session Manager (system-wide)
 Documentation=https://pipewire.org/news/wireplumber/
-After=pipewire-system.service
-Requires=pipewire-system.service
+After=pipewire.service
+Requires=pipewire.service
 
 [Service]
 Type=simple
