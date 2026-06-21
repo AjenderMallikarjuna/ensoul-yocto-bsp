@@ -161,7 +161,72 @@ journalctl -u wireplumber-system.service --no-pager | grep -E "Started|ERROR|cra
 systemctl status pipewire-system.service
 ```
 
-#### 6. Exit QEMU
+#### 6. Host mic/speaker test via WSLg PulseAudio (optional)
+
+This routes QEMU audio through Windows speakers and mic using WSLg's PulseAudio bridge.
+
+**Prerequisite — check WSLg is available (run in WSL2 before booting QEMU):**
+
+```bash
+ls /mnt/wslg/PulseServer && echo "WSLg PulseAudio available"
+# If this fails, WSLg is not active. Use the WAV fallback below instead.
+```
+
+**Boot with host audio (WSLg path):**
+
+```bash
+cd ~/ensoul-yocto-bsp
+source poky/oe-init-build-env build
+
+# PULSE_SERVER tells the host-side QEMU pa backend where WSLg's socket is
+PULSE_SERVER=unix:/mnt/wslg/PulseServer runqemu qemuarm64 nographic slirp audio
+```
+
+> `kas/anime-ai-qemuarm64.yml` already sets `QB_AUDIO_OPT` with
+> `server=unix:/mnt/wslg/PulseServer`, so `runqemu` picks it up automatically
+> when you pass the `audio` keyword.
+
+**Inside QEMU — test playback through Windows speakers:**
+
+```bash
+# Generate a 1 kHz sine wave for 3 seconds and play through HDA Intel
+speaker-test -c 2 -t sine -f 1000 -l 1 -D hw:1,0
+# You should hear a tone from your Windows speakers.
+```
+
+**Inside QEMU — test mic capture from Windows microphone:**
+
+```bash
+# Record 3 seconds from HDA Intel capture device
+arecord -D hw:1,0 -f S16_LE -r 16000 -c 1 -d 3 /tmp/test.wav && echo "Capture OK"
+
+# Play it back to verify the recording
+aplay -D hw:1,0 /tmp/test.wav
+```
+
+> **Windows privacy note:** If the mic test captures silence, check:
+> `Settings → Privacy & security → Microphone → Allow desktop apps to access your microphone`
+> (must be ON for WSLg to pass through the mic).
+
+**WAV fallback (no WSLg / native Linux host):**
+
+If WSLg is not available, patch `qemuboot.conf` to write audio to a WAV file instead:
+
+```bash
+# Run in ~/ensoul-yocto-bsp/build/tmp/deploy/images/qemuarm64/
+sed -i 's/qb_audio_drv = pa/qb_audio_drv = wav/' *.qemuboot.conf
+sed -i 's|-audiodev pa,id=snd0,server=unix:/mnt/wslg/PulseServer|-audiodev wav,id=snd0,path=/tmp/ensoul-qemu.wav|' *.qemuboot.conf
+
+# Boot normally
+runqemu qemuarm64 nographic slirp audio
+
+# After poweroff, inspect the captured audio on the host
+aplay /tmp/ensoul-qemu.wav
+```
+
+---
+
+#### 7. Exit QEMU
 
 ```bash
 poweroff

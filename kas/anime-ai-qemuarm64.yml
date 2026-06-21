@@ -44,11 +44,12 @@ local_conf_header:
   anime-ai-audio: |
     # QEMU Intel HDA audio emulation.
     # QB_AUDIO_DRV controls the host-side backend:
-    #   "pa"   — PulseAudio (works on WSL2 with WSLg, native Linux)
-    #   "alsa" — ALSA directly on the host
+    #   "pa"   — PulseAudio via WSLg (Windows 11 + WSLg required)
+    #            WSLg exposes PulseAudio at unix:/mnt/wslg/PulseServer
     #   "wav"  — write audio to /tmp/ensoul-qemu.wav (no host audio needed)
+    # For non-WSLg environments, patch qemuboot.conf to use qb_audio_drv = wav
     QB_AUDIO_DRV = "pa"
-    QB_AUDIO_OPT = "-device intel-hda -device hda-duplex,audiodev=snd0 -audiodev pa,id=snd0"
+    QB_AUDIO_OPT = "-device intel-hda -device hda-duplex,audiodev=snd0 -audiodev pa,id=snd0,server=unix:/mnt/wslg/PulseServer"
     MACHINE_FEATURES:append = " alsa"
 
   anime-ai-dev: |
