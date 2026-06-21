@@ -21,7 +21,7 @@ RDEPENDS:${PN} = " \
     wireplumber \
     pipewire-system \
     \
-    webrtc-audio-processing \
+    libwebrtc-audio-processing1 \
     \
     ensoul-tools \
 "
