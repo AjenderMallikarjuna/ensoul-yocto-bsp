@@ -57,3 +57,9 @@ local_conf_header:
     BB_NUMBER_THREADS = "16"
     PARALLEL_MAKE = "-j16"
     PARALLEL_MAKE:pn-libmpc-native = "-j1"
+
+  anime-ai-secrets: |
+    # API keys are passed via environment variables, never committed to git.
+    # Before building, export: ENSOUL_GROQ_KEY="gsk_..."
+    BB_ENV_PASSTHROUGH_ADDITIONS += "ENSOUL_GROQ_KEY"
+    ENSOUL_GROQ_KEY ?= ""
