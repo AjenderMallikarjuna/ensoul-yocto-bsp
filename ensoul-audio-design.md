@@ -2,7 +2,7 @@
 
 **Project:** Ensoul AI Companion Device  
 **Document type:** Technical Architecture & Design  
-**Status:** Working Draft — QEMU Development Phase  
+**Status:** Working Draft — Phase 1 Complete (STT verified on QEMU)  
 **Prepared by:** Ajender Reddy Mallikarjuna  
 **Date:** June 2026
 
@@ -50,9 +50,17 @@ The audio system is the emotional core of the product. A child's first interacti
 | Always-on | RTOS co-processor (Zephyr/FreeRTOS) for wake word during SoC sleep |
 | OS | Yocto Linux (Scarthgap), built with kas |
 
-### Current development status
+### Current development status (as of 2026-06-21)
 
-No hardware exists yet. Development is on QEMU ARM64 using the existing kas build configuration in `kas/anime-ai-qemuarm64.yml`. The full Yocto layer is in `meta-anime-ai/`. A companion daemon (`companion-daemon`) already exists with the device's AI personality logic.
+No hardware exists yet. Development and all testing is on **QEMU ARM64**.
+
+**Phase 0 complete:** QEMU boots with PipeWire audio stack (PipeWire + WirePlumber system-wide). Intel HDA emulation routes through WSLg PulseAudio to Windows host speakers and mic. All 6 audio stack checks pass.
+
+**Phase 1 complete:** `sherpa-onnx v1.13.3` (pre-built aarch64 CPU package) is in the Yocto image. The streaming Zipformer 20M English model (int8 quantized) was tested live — real speech was captured from mic via ALSA `hw:1,0`, transcribed, and returned correctly. Mic calibrated to 300% WSLg volume (RMS ~26%, confidence scores -0.1 to -0.8).
+
+**QEMU performance note:** STT inference RTF on emulated cortex-a57 is ~2.7 (cannot stream in real time). This is emulation overhead, not a software issue. RK3588 Cortex-A76 at 2.4 GHz is expected to achieve RTF < 0.5.
+
+**Up next:** LLM response (Phase 2) → TTS playback (Phase 3) → wake word (Phase 4).
 
 ---
 
@@ -950,34 +958,41 @@ For a device that is plugged into mains power (which v1 almost certainly is), 40
 
 Development proceeds in phases on QEMU ARM64 using the existing kas configuration. All phases produce working, testable software.
 
-### Phase 0 — Bootable QEMU image with audio
+### Phase 0 — Bootable QEMU image with audio ✅ COMPLETE
 
 **Goal:** QEMU ARM64 boots, PipeWire running, `aplay` and `arecord` work with virtual audio.
 
-**What to build:**
-- Add PipeWire and wireplumber to `anime-ai-image.bb`
-- Add webrtc-audio-processing to image
-- Configure QEMU virtio-snd device in kas config
-- Verify with `pw-cli` and `aplay -l`
+**What was built:**
+- PipeWire + WirePlumber in `packagegroup-anime-ai.bb`; `webrtc-audio-processing` in image
+- Intel HDA (`snd_hda_intel`) in kernel config; QEMU `-device intel-hda` in kas config
+- `wireplumber-system.service` depending on built-in `pipewire.service` (socket-activated)
+- WSLg PulseAudio backend: `-audiodev pa,id=snd0,server=unix:/mnt/wslg/PulseServer,in.name=RDPSource,out.name=RDPSink`
+- `scripts/boot-qemu-audio.sh` for one-command QEMU boot with host audio
+- `test-audio.sh` verification script installed to `/usr/share/ensoul/`
 
-**Exit criteria:** `aplay /usr/share/sounds/test.wav` produces audio output in QEMU.
+**Actual exit criteria met:** 6/6 checks pass (kernel module, ALSA play, ALSA capture, PipeWire socket, PipeWire connection, WirePlumber audio nodes). Host speaker playback and mic loopback both confirmed working via WSLg.
 
-**Estimated time:** 1–2 days
+**Key lesson:** Do NOT run a second `pipewire-system.service` — Scarthgap's built-in `pipewire.service` is already system-wide and socket-activated. A second instance causes a lock-file conflict (status=245/KSM crash loop).
 
 ---
 
-### Phase 1 — Sherpa-ONNX working in QEMU
+### Phase 1 — Sherpa-ONNX STT verified on live mic ✅ COMPLETE
 
-**Goal:** Sherpa-ONNX STT processes a WAV file and produces a transcription.
+**Goal:** Sherpa-ONNX STT captures real speech from the mic and produces a transcription.
 
-**What to build:**
-- Add Sherpa-ONNX as a Yocto recipe (CMake-based, straightforward)
-- Download and package the Zipformer model
-- Write a test harness: feed a WAV file, print transcription
+**What was built:**
+- `meta-anime-ai/recipes-ai/sherpa-onnx/sherpa-onnx_1.13.3.bb` — pre-built aarch64 CPU shared library tarball (3 runtime libs + 39 CLI binaries); `INSANE_SKIP` for arch/stripped/file-rdeps; `FILES:${PN}-dev = ""` to keep unversioned `.so` in runtime package
+- `fetch-stt-model.sh` — downloads Zipformer 20M EN model (int8) inside QEMU
+- Mic calibrated to 300% WSLg volume (RMS 26%, plosive clips acceptable)
+- Model: `sherpa-onnx-streaming-zipformer-en-20M-2023-02-17`, int8 quantized (42 MB)
 
-**Exit criteria:** `abox-test input.wav` prints the correct transcription of a pre-recorded WAV file.
+**Actual exit criteria met:**
+- `sherpa-onnx-version` → v1.13.3 in image
+- Offline WAV test: reference audio transcribed correctly
+- Live mic test: real speech captured from `hw:1,0`, transcribed with confidence scores -0.1 to -0.8
+- RTF on QEMU: ~2.7 (expected — RK3588 Cortex-A76 target: < 0.5)
 
-**Estimated time:** 2–3 days
+**Key lesson:** Use pre-built aarch64 binaries rather than building Sherpa-ONNX from source in Yocto — ONNX Runtime's CMake build is complex and takes hours; the upstream release tarball is fully self-contained and reduces build time to seconds.
 
 ---
 
