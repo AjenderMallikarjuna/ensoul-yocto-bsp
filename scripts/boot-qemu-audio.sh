@@ -26,16 +26,18 @@ PULSE_SERVER=unix:/mnt/wslg/PulseServer pactl set-source-volume RDPSource 300%
 
 echo "Image: $IMG"
 echo "SSH will be available at: ssh -p 2222 root@127.0.0.1"
+echo "Aria web UI will be at:   http://127.0.0.1:8080/"
 echo ""
 
-exec PULSE_SERVER=unix:/mnt/wslg/PulseServer qemu-system-aarch64 \
+export PULSE_SERVER=unix:/mnt/wslg/PulseServer
+exec qemu-system-aarch64 \
     -machine virt -cpu cortex-a57 -smp 4 -m 256 \
     -kernel "$KERNEL" \
     -append "root=/dev/vda rw mem=256M ip=dhcp console=ttyAMA0 console=hvc0 swiotlb=0 net.ifnames=0" \
     -drive id=disk0,file="$IMG",if=none,format=raw \
     -device virtio-blk-pci,drive=disk0 \
     -device virtio-net-pci,netdev=net0,mac=52:54:00:12:35:02 \
-    -netdev user,id=net0,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -netdev user,id=net0,hostfwd=tcp:127.0.0.1:2222-:22,hostfwd=tcp:127.0.0.1:8080-:8080 \
     -object rng-random,filename=/dev/urandom,id=rng0 \
     -device virtio-rng-pci,rng=rng0 \
     -device intel-hda \

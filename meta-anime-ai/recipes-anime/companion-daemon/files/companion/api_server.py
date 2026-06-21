@@ -9,15 +9,34 @@ Endpoints:
   POST /chat            — body: {"message": "..."} — text chat, returns reply + emotion
   POST /listen          — start one full mic → response turn (async, 202)
   POST /say             — body: {"text": "..."} — skip STT (dev mode, async, 202)
+  POST /stt             — body: raw 16-bit PCM WAV — returns {"text": "..."}
 """
 import json
 import logging
+import os
+import subprocess
+import tempfile
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 log = logging.getLogger("companion.api")
 
 _DEFAULT_PORT = 8080
+
+# Candidate model directories, checked in order at runtime.
+_STT_MODEL_DIRS = [
+    "/opt/ensoul/models/stt/sherpa-onnx-streaming-zipformer-en-20M-2023-02-17",
+    "/tmp/stt/sherpa-onnx-streaming-zipformer-en-20M-2023-02-17",
+]
+
+
+def _find_stt_model() -> str | None:
+    for d in _STT_MODEL_DIRS:
+        enc = os.path.join(d, "encoder-epoch-99-avg-1.int8.onnx")
+        if os.path.isfile(enc):
+            return d
+    return None
+
 
 # ---------------------------------------------------------------------------
 # Inline chat UI — dark anime aesthetic, zero external dependencies
@@ -150,6 +169,103 @@ _CHAT_HTML = """<!DOCTYPE html>
     0%,60%,100% { transform: translateY(0); }
     30% { transform: translateY(-6px); }
   }
+
+  /* ── Voice panel ───────────────────────────────────────────────────── */
+  #voice-panel {
+    background: #0f0f20;
+    border-top: 1px solid #1e1e35;
+    padding: 10px 16px;
+    flex-shrink: 0;
+  }
+  #voice-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .voice-btn {
+    border: none;
+    border-radius: 22px;
+    padding: 8px 18px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    transition: opacity 0.2s, transform 0.1s;
+    flex-shrink: 0;
+  }
+  .voice-btn:active { transform: scale(0.95); }
+  .voice-btn:disabled { opacity: 0.35; cursor: default; }
+  #record-btn {
+    background: linear-gradient(135deg, #be123c, #e11d48);
+    color: #fff;
+    box-shadow: 0 2px 10px rgba(225,29,72,0.35);
+  }
+  #record-btn.recording {
+    background: linear-gradient(135deg, #9f1239, #be123c);
+    box-shadow: 0 0 0 0 rgba(225,29,72,0.6);
+    animation: pulse-ring 1.2s ease-out infinite;
+  }
+  @keyframes pulse-ring {
+    0%   { box-shadow: 0 0 0 0   rgba(225,29,72,0.6); }
+    70%  { box-shadow: 0 0 0 10px rgba(225,29,72,0);   }
+    100% { box-shadow: 0 0 0 0   rgba(225,29,72,0);   }
+  }
+  #listen-btn {
+    background: #1e1e38;
+    border: 1px solid #3a3a5a;
+    color: #a0a0c8;
+  }
+  #listen-btn:not(:disabled):hover { background: #26263a; color: #c0c0e0; }
+  #voice-status {
+    font-size: 0.75rem;
+    color: #555577;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #voice-status.active { color: #f43f5e; }
+  #voice-status.processing { color: #a78bfa; }
+  #voice-status.done { color: #34d399; }
+
+  #stt-box {
+    display: none;
+    margin-top: 8px;
+    background: #111128;
+    border: 1px solid #2a2a4a;
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-size: 0.88rem;
+    line-height: 1.5;
+    color: #c8c8e8;
+    position: relative;
+  }
+  #stt-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #555577;
+    margin-bottom: 4px;
+  }
+  #stt-text { min-height: 1.4em; }
+  #use-in-chat {
+    position: absolute;
+    top: 8px; right: 10px;
+    background: #6d28d9;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 3px 10px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  #use-in-chat:hover { opacity: 0.8; }
+
+  /* ── Text footer ───────────────────────────────────────────────────── */
   footer {
     background: #12121f;
     border-top: 1px solid #1e1e35;
@@ -216,12 +332,27 @@ _CHAT_HTML = """<!DOCTYPE html>
 </div>
 <div id="typing"><span></span><span></span><span></span></div>
 
+<!-- Voice testing panel -->
+<div id="voice-panel">
+  <div id="voice-controls">
+    <button class="voice-btn" id="record-btn" title="Record from mic">🎤 Record</button>
+    <button class="voice-btn" id="listen-btn" disabled title="Play back recording">🔊 Listen</button>
+    <span id="voice-status">Ready — click Record to start</span>
+  </div>
+  <div id="stt-box">
+    <div id="stt-label">STT Transcript</div>
+    <div id="stt-text"></div>
+    <button id="use-in-chat">Use in chat ↑</button>
+  </div>
+</div>
+
 <footer>
   <textarea id="input" rows="1" placeholder="Talk to Aria…"></textarea>
   <button id="send-btn" title="Send">&#10148;</button>
 </footer>
 
 <script>
+// ── Chat UI ────────────────────────────────────────────────────────────────
 const messagesEl = document.getElementById('messages');
 const inputEl    = document.getElementById('input');
 const sendBtn    = document.getElementById('send-btn');
@@ -300,6 +431,164 @@ inputEl.addEventListener('keydown', e => {
 inputEl.addEventListener('input', () => {
   inputEl.style.height = 'auto';
   inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
+});
+
+// ── Voice / STT panel ──────────────────────────────────────────────────────
+const recordBtn   = document.getElementById('record-btn');
+const listenBtn   = document.getElementById('listen-btn');
+const voiceStatus = document.getElementById('voice-status');
+const sttBox      = document.getElementById('stt-box');
+const sttText     = document.getElementById('stt-text');
+const useInChat   = document.getElementById('use-in-chat');
+
+let audioCtx      = null;
+let mediaStream   = null;
+let processor     = null;
+let recordedChunks = [];   // Float32Array[]
+let recordingBlob  = null; // WAV Blob for Listen playback
+let isRecording    = false;
+
+function setVoiceStatus(msg, cls) {
+  voiceStatus.textContent = msg;
+  voiceStatus.className   = cls || '';
+}
+
+// Encode Float32 PCM chunks → WAV ArrayBuffer (16-bit mono, 16 kHz)
+function encodeWAV(chunks, sampleRate) {
+  let total = 0;
+  for (const c of chunks) total += c.length;
+  const pcm = new Float32Array(total);
+  let off = 0;
+  for (const c of chunks) { pcm.set(c, off); off += c.length; }
+
+  const buf  = new ArrayBuffer(44 + pcm.length * 2);
+  const view = new DataView(buf);
+  function str(o, s) { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); }
+
+  str(0,  'RIFF');
+  view.setUint32(4,  36 + pcm.length * 2, true);
+  str(8,  'WAVE');
+  str(12, 'fmt ');
+  view.setUint32(16, 16,            true);   // chunk size
+  view.setUint16(20, 1,             true);   // PCM
+  view.setUint16(22, 1,             true);   // mono
+  view.setUint32(24, sampleRate,    true);
+  view.setUint32(28, sampleRate * 2, true);  // byte rate
+  view.setUint16(32, 2,             true);   // block align
+  view.setUint16(34, 16,            true);   // bits per sample
+  str(36, 'data');
+  view.setUint32(40, pcm.length * 2, true);
+
+  let p = 44;
+  for (let i = 0; i < pcm.length; i++) {
+    const s = Math.max(-1, Math.min(1, pcm[i]));
+    view.setInt16(p, s * 0x7FFF, true);
+    p += 2;
+  }
+  return buf;
+}
+
+async function startRecording() {
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true }
+    });
+  } catch (e) {
+    setVoiceStatus('Mic access denied — allow mic in browser', '');
+    return;
+  }
+
+  audioCtx = new AudioContext({ sampleRate: 16000 });
+  const source = audioCtx.createMediaStreamSource(mediaStream);
+  processor = audioCtx.createScriptProcessor(2048, 1, 1);
+  recordedChunks = [];
+
+  processor.onaudioprocess = (e) => {
+    if (isRecording) recordedChunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+  };
+
+  source.connect(processor);
+  processor.connect(audioCtx.destination);
+
+  isRecording = true;
+  recordBtn.textContent = '⏹ Stop';
+  recordBtn.classList.add('recording');
+  listenBtn.disabled = true;
+  sttBox.style.display = 'none';
+  setVoiceStatus('Recording… speak now', 'active');
+}
+
+async function stopRecording() {
+  isRecording = false;
+  processor.disconnect();
+  mediaStream.getTracks().forEach(t => t.stop());
+  audioCtx.close();
+
+  recordBtn.textContent = '🎤 Record';
+  recordBtn.classList.remove('recording');
+
+  if (recordedChunks.length === 0) {
+    setVoiceStatus('Nothing recorded', '');
+    return;
+  }
+
+  setVoiceStatus('Processing… running STT on device', 'processing');
+  recordBtn.disabled = true;
+  listenBtn.disabled = true;
+
+  const wavBuf = encodeWAV(recordedChunks, 16000);
+  recordingBlob = new Blob([wavBuf], { type: 'audio/wav' });
+
+  // Enable Listen playback
+  listenBtn.disabled = false;
+
+  // Send WAV to /stt endpoint on the device
+  try {
+    const res  = await fetch('/stt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'audio/wav' },
+      body: wavBuf,
+    });
+    const data = await res.json();
+
+    if (res.ok && data.text) {
+      sttText.textContent = data.text;
+      sttBox.style.display = 'block';
+      setVoiceStatus('Done — transcript below', 'done');
+    } else if (res.status === 503) {
+      sttText.textContent = data.error || 'STT model not found on device.';
+      sttBox.style.display = 'block';
+      setVoiceStatus('Model missing — run fetch-stt-model.sh inside QEMU', '');
+    } else {
+      setVoiceStatus('STT error: ' + (data.error || res.status), '');
+    }
+  } catch (e) {
+    setVoiceStatus('Network error — is device reachable?', '');
+  }
+
+  recordBtn.disabled = false;
+}
+
+recordBtn.addEventListener('click', () => {
+  if (isRecording) stopRecording();
+  else startRecording();
+});
+
+listenBtn.addEventListener('click', () => {
+  if (!recordingBlob) return;
+  const url   = URL.createObjectURL(recordingBlob);
+  const audio = new Audio(url);
+  audio.onended = () => URL.revokeObjectURL(url);
+  audio.play();
+});
+
+useInChat.addEventListener('click', () => {
+  const t = sttText.textContent.trim();
+  if (!t) return;
+  inputEl.value = t;
+  inputEl.style.height = 'auto';
+  inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
+  inputEl.focus();
 });
 </script>
 </body>
@@ -381,8 +670,6 @@ class _Handler(BaseHTTPRequestHandler):
             if not message:
                 self._send_json(400, {"error": "message field required"})
                 return
-            # Serialize LLM calls with the daemon lock so voice pipeline turns
-            # and web chat turns don't interleave inside ChatSession.
             with d._lock:
                 reply, label, intensity = d.session.send(message)
             threading.Thread(
@@ -415,6 +702,62 @@ class _Handler(BaseHTTPRequestHandler):
                 return
             threading.Thread(target=d.handle_text_input, args=(text,), daemon=True).start()
             self._send_json(202, {"status": "started", "text": text})
+
+        elif self.path == "/stt":
+            length = int(self.headers.get("Content-Length", 0))
+            if length == 0:
+                self._send_json(400, {"error": "no audio data"})
+                return
+
+            audio_data = self.rfile.read(length)
+
+            model_dir = _find_stt_model()
+            if not model_dir:
+                self._send_json(503, {
+                    "error": "STT model not found. Run /usr/share/ensoul/fetch-stt-model.sh inside the device."
+                })
+                return
+
+            tmp = None
+            try:
+                with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+                    f.write(audio_data)
+                    tmp = f.name
+
+                result = subprocess.run(
+                    [
+                        "sherpa-onnx",
+                        f"--encoder={model_dir}/encoder-epoch-99-avg-1.int8.onnx",
+                        f"--decoder={model_dir}/decoder-epoch-99-avg-1.int8.onnx",
+                        f"--joiner={model_dir}/joiner-epoch-99-avg-1.int8.onnx",
+                        f"--tokens={model_dir}/tokens.txt",
+                        "--num-threads=2",
+                        tmp,
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=120,
+                )
+
+                transcript = ""
+                for line in result.stdout.splitlines():
+                    if '"text"' in line:
+                        try:
+                            obj = json.loads(line.strip())
+                            transcript = obj.get("text", "")
+                        except json.JSONDecodeError:
+                            pass
+
+                self._send_json(200, {"text": transcript})
+
+            except subprocess.TimeoutExpired:
+                self._send_json(504, {"error": "STT inference timed out"})
+            except Exception as e:
+                log.exception("STT error")
+                self._send_json(500, {"error": str(e)})
+            finally:
+                if tmp and os.path.exists(tmp):
+                    os.unlink(tmp)
 
         else:
             self._send_json(404, {"error": "not found"})
