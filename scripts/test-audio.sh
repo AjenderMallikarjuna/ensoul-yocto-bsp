@@ -60,12 +60,15 @@ fi
 # ── 4. WirePlumber / ALSA nodes ────────────────────────────────────────────
 echo ""
 echo "── WirePlumber / Audio nodes ──"
-PW_OUT=$(PIPEWIRE_RUNTIME_DIR=/run/pipewire pw-cli list-objects 2>/dev/null || true)
+# pw-dump is reliable over non-interactive connections; pw-cli list-objects
+# is non-deterministic and sometimes returns empty output in subshells.
+PW_DUMP=$(PIPEWIRE_RUNTIME_DIR=/run/pipewire pw-dump 2>/dev/null || true)
 
-if echo "$PW_OUT" | grep -q "Audio"; then
+if echo "$PW_DUMP" | grep -q '"Audio/Sink"'; then
     ok "Audio nodes visible in PipeWire graph"
-    NODES=$(echo "$PW_OUT" | grep -i "media.class" | grep -i audio | wc -l)
-    info "$NODES audio node(s) registered"
+    SINKS=$(echo "$PW_DUMP" | grep -c '"Audio/Sink"' || true)
+    SOURCES=$(echo "$PW_DUMP" | grep -c '"Audio/Source"' || true)
+    info "$SINKS sink(s), $SOURCES source(s) registered"
 else
     fail "No audio nodes in PipeWire — WirePlumber may not have discovered ALSA yet"
     info "  systemctl status wireplumber-system.service"
