@@ -15,11 +15,11 @@ driver = "auto"
 
 [api]
 # stt_provider: openai-whisper
-# llm_provider: anthropic
-# tts_provider: openai | espeak  (espeak works without API key)
+# llm_provider: anthropic | groq
+# tts_provider: piper | openai | espeak
 stt_provider = "openai-whisper"
 llm_provider = "groq"
-tts_provider = "espeak"
+tts_provider = "piper"
 
 [personality]
 name = "Aria"

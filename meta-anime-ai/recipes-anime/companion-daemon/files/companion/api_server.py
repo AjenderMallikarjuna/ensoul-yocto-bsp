@@ -19,6 +19,8 @@ import tempfile
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
+from companion import tts as _tts
+
 log = logging.getLogger("companion.api")
 
 _DEFAULT_PORT = 8080
@@ -322,6 +324,11 @@ _CHAT_HTML = """<!DOCTYPE html>
     <div class="dot"></div>
     <span id="emotion-label">calm</span>
   </div>
+  <button id="mute-btn" title="Toggle Aria voice" style="
+    background:none; border:1px solid #2a2a4a; border-radius:50%;
+    width:36px; height:36px; cursor:pointer; font-size:16px;
+    color:#8888aa; flex-shrink:0; transition:all 0.2s;
+  ">🔊</button>
 </header>
 
 <div id="messages">
@@ -415,6 +422,7 @@ async function sendMessage() {
     if (res.ok) {
       appendMessage('aria', data.reply, data.emotion.label, data.emotion.intensity);
       setEmotion(data.emotion.label);
+      playTTS(data.reply);
     } else {
       appendMessage('aria', '⚠ ' + (data.error || 'Something went wrong.'), 'concerned', 0.7);
     }
@@ -432,6 +440,35 @@ inputEl.addEventListener('input', () => {
   inputEl.style.height = 'auto';
   inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
 });
+
+// ── TTS auto-play ──────────────────────────────────────────────────────────
+let isMuted = false;
+const muteBtn = document.getElementById('mute-btn');
+
+muteBtn.addEventListener('click', () => {
+  isMuted = !isMuted;
+  muteBtn.textContent = isMuted ? '🔇' : '🔊';
+  muteBtn.style.color  = isMuted ? '#6d28d9' : '#8888aa';
+});
+
+async function playTTS(text) {
+  if (isMuted) return;
+  try {
+    const res = await fetch('/tts', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({text}),
+    });
+    if (!res.ok) return;
+    const blob  = await res.blob();
+    const url   = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    audio.onended = () => URL.revokeObjectURL(url);
+    audio.play();
+  } catch {
+    // TTS playback failure is non-fatal — Aria stays silent
+  }
+}
 
 // ── Voice / STT panel ──────────────────────────────────────────────────────
 const recordBtn   = document.getElementById('record-btn');
@@ -760,6 +797,26 @@ class _Handler(BaseHTTPRequestHandler):
             finally:
                 if tmp and os.path.exists(tmp):
                     os.unlink(tmp)
+
+        elif self.path == "/tts":
+            body = self._read_json()
+            text = body.get("text", "").strip()
+            if not text:
+                self._send_json(400, {"error": "text field required"})
+                return
+            try:
+                cfg = self.daemon_ref.cfg
+                wav_path = _tts.synthesize(text, cfg.api.tts_provider, cfg.openai_api_key)
+                wav_data = wav_path.read_bytes()
+                wav_path.unlink(missing_ok=True)
+                self.send_response(200)
+                self.send_header("Content-Type", "audio/wav")
+                self.send_header("Content-Length", str(len(wav_data)))
+                self.end_headers()
+                self.wfile.write(wav_data)
+            except Exception as e:
+                log.exception("TTS error")
+                self._send_json(500, {"error": str(e)})
 
         else:
             self._send_json(404, {"error": "not found"})

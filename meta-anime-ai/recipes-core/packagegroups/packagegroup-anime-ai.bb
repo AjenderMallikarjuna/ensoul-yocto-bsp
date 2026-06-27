@@ -25,4 +25,5 @@ RDEPENDS:${PN} = " \
     ensoul-provision \
     \
     sherpa-onnx \
+    piper-tts \
 "
