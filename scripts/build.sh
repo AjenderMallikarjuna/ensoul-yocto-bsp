@@ -8,10 +8,16 @@
 
 set -e
 
+# Load from ~/.ensoul-secrets if the env var isn't already set
+if [ -z "$ENSOUL_GROQ_KEY" ] && [ -f "$HOME/.ensoul-secrets" ]; then
+    # shellcheck disable=SC1091
+    . "$HOME/.ensoul-secrets"
+fi
+
 if [ -z "$ENSOUL_GROQ_KEY" ]; then
     echo "WARNING: ENSOUL_GROQ_KEY is not set — Aria will not be able to reply."
-    echo "  Export it first:  export ENSOUL_GROQ_KEY=\"gsk_...\""
-    echo "  Or add it to ~/.bashrc for persistence."
+    echo "  Option 1: export ENSOUL_GROQ_KEY=\"gsk_...\" before running"
+    echo "  Option 2: echo 'ENSOUL_GROQ_KEY=gsk_...' > ~/.ensoul-secrets"
     echo ""
 fi
 
