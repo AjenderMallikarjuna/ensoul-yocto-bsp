@@ -22,6 +22,8 @@ do_install() {
     # Install everything into /usr/lib/piper — binary, bundled libs, espeak-ng-data
     install -d ${D}/usr/lib/piper
     cp -a ${S}/. ${D}/usr/lib/piper/
+    # cp -a preserves host uid/gid; reset to root to avoid do_package "host contamination"
+    chown -R root:root ${D}/usr/lib/piper
 
     # Wrapper script: cd into the piper dir so the binary finds espeak-ng-data
     # relative to itself, and sets LD_LIBRARY_PATH for the bundled .so files.
