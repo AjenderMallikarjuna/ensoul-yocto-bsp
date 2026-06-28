@@ -1,0 +1,15 @@
+[Unit]
+Description=Hermes Supervisor — Session FSM orchestrator
+After=pipewire.service hermes-abox.service hermes-cloud-connector.service hermes-voice-trigger.service
+Requires=hermes-abox.service hermes-cloud-connector.service hermes-voice-trigger.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/hermes_supervisor
+Restart=on-failure
+RestartSec=2s
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

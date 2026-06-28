@@ -41,8 +41,15 @@ do_install() {
         install -m 0755 "$b" ${D}${bindir}/
     done
 
-    # Directory for STT models (populated at runtime or by a model recipe)
+    # C/C++ API headers — required by hermes_voice_trigger for KWD at build time
+    if [ -d ${S}/include ]; then
+        install -d ${D}${includedir}
+        cp -r ${S}/include/. ${D}${includedir}/
+    fi
+
+    # Directories for models (populated at runtime by ensoul-provision)
     install -d ${D}/opt/ensoul/models/stt
+    install -d ${D}/opt/ensoul/models/kws
 }
 
 FILES:${PN} = " \
@@ -53,6 +60,11 @@ FILES:${PN} = " \
     ${bindir}/sense-voice-simulate-streaming-alsa-cxx-api \
     ${bindir}/zipformer-ctc-simulate-streaming-alsa-cxx-api \
     /opt/ensoul/models/stt \
+    /opt/ensoul/models/kws \
+"
+
+FILES:${PN}-dev = " \
+    ${includedir}/sherpa-onnx \
 "
 
 # Only meaningful on 64-bit ARM targets

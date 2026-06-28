@@ -1,0 +1,18 @@
+[Unit]
+Description=Hermes CloudConnector — STT → Groq LLM → Piper TTS pipeline
+After=network-online.target pipewire.service ensoul-provision.service
+Wants=network-online.target pipewire.service
+Requires=ensoul-provision.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/hermes_cloud_connector
+Restart=on-failure
+RestartSec=2s
+# Load Groq API key from secrets file
+EnvironmentFile=-/etc/anime-ai/secrets.env
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

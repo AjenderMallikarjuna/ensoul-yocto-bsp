@@ -26,4 +26,6 @@ RDEPENDS:${PN} = " \
     \
     sherpa-onnx \
     piper-tts \
+    \
+    hermes \
 "

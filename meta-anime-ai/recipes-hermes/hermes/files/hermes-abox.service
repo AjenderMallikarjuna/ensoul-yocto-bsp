@@ -1,0 +1,19 @@
+[Unit]
+Description=Hermes ABOX — PipeWire DSP audio engine
+After=pipewire.service wireplumber.service
+Wants=pipewire.service wireplumber.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/hermes_abox
+Restart=on-failure
+RestartSec=2s
+# RT scheduling for the audio data-plane
+IOSchedulingClass=realtime
+CPUSchedulingPolicy=fifo
+CPUSchedulingPriority=80
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -34,9 +34,28 @@ if [ -f "$TTS_MODEL" ]; then
 else
     echo "ensoul-provision: downloading Piper voice model (~61 MB)..."
     mkdir -p "$TTS_DIR"
-    wget -q -O "$TTS_MODEL"      "${TTS_BASE}/${TTS_VOICE}.onnx"
+    wget -q -O "$TTS_MODEL"        "${TTS_BASE}/${TTS_VOICE}.onnx"
     wget -q -O "${TTS_MODEL}.json" "${TTS_BASE}/${TTS_VOICE}.onnx.json"
     echo "ensoul-provision: Piper voice model installed"
+fi
+
+# ── KWS model for "Hey Aria" (sherpa-onnx Zipformer 3.3M, ~4 MB) ──────────
+KWS_DIR="/opt/ensoul/models/kws"
+KWS_NAME="sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01"
+KWS_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/${KWS_NAME}.tar.bz2"
+KWS_ENCODER="$KWS_DIR/$KWS_NAME/encoder-epoch-12-avg-2-chunk-16-left-64.int8.onnx"
+
+if [ -f "$KWS_ENCODER" ]; then
+    echo "ensoul-provision: KWS model already present"
+else
+    echo "ensoul-provision: downloading KWS model (~4 MB)..."
+    mkdir -p "$KWS_DIR"
+    wget -q -O - "$KWS_URL" | tar -xjf - -C "$KWS_DIR" \
+        "$KWS_NAME/encoder-epoch-12-avg-2-chunk-16-left-64.int8.onnx" \
+        "$KWS_NAME/decoder-epoch-12-avg-2-chunk-16-left-64.int8.onnx" \
+        "$KWS_NAME/joiner-epoch-12-avg-2-chunk-16-left-64.int8.onnx" \
+        "$KWS_NAME/tokens.txt"
+    echo "ensoul-provision: KWS model installed"
 fi
 
 echo "ensoul-provision: done"

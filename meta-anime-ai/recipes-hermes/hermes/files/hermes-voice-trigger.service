@@ -1,0 +1,16 @@
+[Unit]
+Description=Hermes VoiceTrigger — always-on "Hey Aria" keyword detection
+After=pipewire.service wireplumber.service ensoul-provision.service
+Wants=pipewire.service wireplumber.service
+Requires=ensoul-provision.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/hermes_voice_trigger
+Restart=on-failure
+RestartSec=2s
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
