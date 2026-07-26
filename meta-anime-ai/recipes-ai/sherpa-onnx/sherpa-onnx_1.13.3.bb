@@ -7,8 +7,10 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/Apache-2.0;md5=89aea4e17d99a7ca
 
 PV = "1.13.3"
 
-SRC_URI = "https://github.com/k2-fsa/sherpa-onnx/releases/download/v${PV}/sherpa-onnx-v${PV}-linux-aarch64-shared-cpu.tar.bz2"
-SRC_URI[sha256sum] = "dca81c3d36c68e84949158a993e2ea99055bcecc96893f93739209fbe2eac649"
+SRC_URI = "https://github.com/k2-fsa/sherpa-onnx/releases/download/v${PV}/sherpa-onnx-v${PV}-linux-aarch64-shared-cpu.tar.bz2;name=tarball \
+           https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v${PV}/sherpa-onnx/c-api/c-api.h;name=capi-header"
+SRC_URI[tarball.sha256sum] = "dca81c3d36c68e84949158a993e2ea99055bcecc96893f93739209fbe2eac649"
+SRC_URI[capi-header.sha256sum] = "587e1039cc4ee242169494f3c0ba5baecc22482341168d88d57db965e1e77fa9"
 
 S = "${WORKDIR}/sherpa-onnx-v${PV}-linux-aarch64-shared-cpu"
 
@@ -41,11 +43,9 @@ do_install() {
         install -m 0755 "$b" ${D}${bindir}/
     done
 
-    # C/C++ API headers — required by hermes_voice_trigger for KWD at build time
-    if [ -d ${S}/include ]; then
-        install -d ${D}${includedir}
-        cp -r ${S}/include/. ${D}${includedir}/
-    fi
+    # c-api.h fetched separately (the pre-built tarball ships no headers)
+    install -d ${D}${includedir}/sherpa-onnx/c-api
+    install -m 0644 ${WORKDIR}/c-api.h ${D}${includedir}/sherpa-onnx/c-api/
 
     # Directories for models (populated at runtime by ensoul-provision)
     install -d ${D}/opt/ensoul/models/stt

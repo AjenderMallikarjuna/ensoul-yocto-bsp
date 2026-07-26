@@ -15,10 +15,11 @@ EXTERNALSRC_BUILD ?= "${WORKDIR}/hermes-build"
 
 # ── Build dependencies ────────────────────────────────────────────────────────
 DEPENDS = " \
-    virtual/pkgconfig \
-    libpipewire-0.3 \
-    libcurl \
+    pkgconfig-native \
+    pipewire \
+    curl \
     sherpa-onnx \
+    webrtc-audio-processing-1 \
 "
 
 # Hermes processes link against PipeWire + libcurl + sherpa-onnx-c-api at runtime
@@ -27,14 +28,18 @@ RDEPENDS:${PN} = " \
     wireplumber \
     libcurl \
     sherpa-onnx \
+    webrtc-audio-processing-1 \
 "
 
 # ── CMake configuration ───────────────────────────────────────────────────────
 EXTRA_OECMAKE = " \
     -DHERMES_BUILD_TESTS=OFF \
     -DCMAKE_BUILD_TYPE=Release \
+    -DPKG_CONFIG_EXECUTABLE=${STAGING_BINDIR_NATIVE}/pkg-config \
     -DCURL_INCLUDE_DIR=${STAGING_INCDIR} \
     -DCURL_LIBRARY=${STAGING_LIBDIR}/libcurl.so \
+    -DSHERPA_C_LIB=${STAGING_LIBDIR}/libsherpa-onnx-c-api.so \
+    -DSHERPA_C_INC=${STAGING_INCDIR} \
 "
 
 # ── Install binaries and service files ───────────────────────────────────────
