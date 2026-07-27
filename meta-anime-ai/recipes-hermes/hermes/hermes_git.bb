@@ -47,7 +47,8 @@ do_install() {
     # Hermes process binaries
     install -d ${D}${bindir}
     for b in hermes_supervisor hermes_abox hermes_voice_trigger \
-              hermes_cloud_connector hermes_codec_hw; do
+              hermes_cloud_connector hermes_codec_hw \
+              hermes_llm_connector hermes_gui_interface; do
         if [ -f ${B}/app/${b} ]; then
             install -m 0755 ${B}/app/${b} ${D}${bindir}/
         fi
