@@ -1,0 +1,66 @@
+header:
+  version: 14
+
+machine: orangepi-5
+distro: poky
+target:
+  - anime-ai-image
+
+repos:
+  poky:
+    url: https://git.yoctoproject.org/poky
+    branch: scarthgap
+    layers:
+      meta:
+      meta-poky:
+      meta-yocto-bsp:
+
+  meta-openembedded:
+    url: https://github.com/openembedded/meta-openembedded.git
+    branch: scarthgap
+    layers:
+      meta-oe:
+      meta-python:
+      meta-networking:
+      meta-multimedia:
+
+  meta-rockchip:
+    url: https://github.com/JeffyCN/meta-rockchip.git
+    branch: scarthgap
+    layers:
+      meta-rockchip:
+
+  meta-anime-ai:
+    path: .
+    layers:
+      meta-anime-ai:
+
+local_conf_header:
+  anime-ai-base: |
+    CONF_VERSION = "2"
+    PACKAGE_CLASSES = "package_ipk"
+    EXTRA_IMAGE_FEATURES ?= "debug-tweaks ssh-server-openssh"
+
+  anime-ai-systemd: |
+    DISTRO_FEATURES:append = " systemd usrmerge wifi bluetooth alsa"
+    VIRTUAL-RUNTIME_init_manager = "systemd"
+    VIRTUAL-RUNTIME_initscripts = ""
+    DISTRO_FEATURES_BACKFILL_CONSIDERED += "sysvinit"
+
+  anime-ai-audio: |
+    # PipeWire with ALSA backend for RK3588S onboard audio
+    MACHINE_FEATURES:append = " alsa"
+
+  anime-ai-dev: |
+    INHERIT += "rm_work"
+    BB_NUMBER_THREADS = "16"
+    PARALLEL_MAKE = "-j16"
+    PARALLEL_MAKE:pn-libmpc-native = "-j1"
+
+  anime-ai-secrets: |
+    BB_ENV_PASSTHROUGH_ADDITIONS += "ENSOUL_GROQ_KEY"
+    ENSOUL_GROQ_KEY ?= ""
+
+  anime-ai-image: |
+    # Write image as .wic for dd-to-SD flashing
+    IMAGE_FSTYPES += "wic.bz2"
