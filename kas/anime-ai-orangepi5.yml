@@ -28,7 +28,7 @@ repos:
     url: https://github.com/JeffyCN/meta-rockchip.git
     branch: scarthgap
     layers:
-      meta-rockchip:
+      .:
 
   meta-anime-ai:
     path: .
