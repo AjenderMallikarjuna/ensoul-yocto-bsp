@@ -68,4 +68,4 @@ FILES:${PN}-dev = " \
 "
 
 # Only meaningful on 64-bit ARM targets
-COMPATIBLE_MACHINE = "qemuarm64|rk3588|orangepi-5"
+COMPATIBLE_MACHINE = "qemuarm64|rk3588|orangepi-5|yy3588"

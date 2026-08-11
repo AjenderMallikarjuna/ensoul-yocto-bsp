@@ -89,4 +89,4 @@ FILES:${PN} = " \
 "
 
 INSANE_SKIP:${PN} = "already-stripped"
-COMPATIBLE_MACHINE = "qemuarm64|rk3588|orangepi-5"
+COMPATIBLE_MACHINE = "qemuarm64|rk3588|orangepi-5|yy3588"

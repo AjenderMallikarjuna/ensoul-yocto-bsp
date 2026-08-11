@@ -13,7 +13,7 @@ INSANE_SKIP:${PN} = "arch already-stripped file-rdeps dev-so"
 FILES:${PN}-dev = ""
 FILES:${PN}-staticdev = ""
 
-COMPATIBLE_MACHINE = "qemuarm64|rk3588|orangepi-5"
+COMPATIBLE_MACHINE = "qemuarm64|rk3588|orangepi-5|yy3588"
 
 do_configure[noexec] = "1"
 do_compile[noexec] = "1"

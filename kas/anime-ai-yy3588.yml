@@ -1,7 +1,7 @@
 header:
   version: 14
 
-machine: orangepi-5
+machine: yy3588
 distro: poky
 target:
   - anime-ai-image
