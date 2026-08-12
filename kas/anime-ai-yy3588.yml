@@ -10,6 +10,7 @@ repos:
   poky:
     url: https://git.yoctoproject.org/poky
     branch: scarthgap
+    commit: 3255ae82d1  # last commit before broken openssl 3.5.6 (ef58892c7f)
     layers:
       meta:
       meta-poky:
