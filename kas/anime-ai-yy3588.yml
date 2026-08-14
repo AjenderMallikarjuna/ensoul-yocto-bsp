@@ -52,6 +52,11 @@ local_conf_header:
     # PipeWire with ALSA backend for RK3588S onboard audio
     MACHINE_FEATURES:append = " alsa"
 
+  anime-ai-hermes: |
+    # Hermes source not yet available on this machine (EXTERNALSRC symlink broken).
+    # Mask the recipe so the rest of the image builds; remove this when source is restored.
+    BBMASK += "meta-anime-ai/recipes-hermes"
+
   anime-ai-dev: |
     INHERIT += "rm_work"
     BB_NUMBER_THREADS = "16"

@@ -26,6 +26,6 @@ RDEPENDS:${PN} = " \
     \
     sherpa-onnx \
     piper-tts \
-    \
-    hermes \
 "
+# hermes excluded: EXTERNALSRC symlink broken on this machine.
+# Restore when Hermes source is available: add back '    hermes \'
